@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Time Series Forecast</title>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <style>
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: grey;
+            shape-rendering: crispEdges;
+        }
+        .x.axis path {
+            display: none;
+        }
+        .legend {
+            font-size: 14px;
+        }
+        .line {
+            fill: none;
+            stroke-width: 2px;
+        }
+        .tooltip {
+            background: #eee;
+            box-shadow: 0 0 5px #999999;
+            color: #333;
+            font-size: 12px;
+            left: 130px;
+            padding: 10px;
+            position: absolute;
+            text-align: center;
+            top: 95px;
+            width: 80px;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="my_dataviz"></div>
+    <div id="tooltip" class="tooltip"></div>
+    <script>
+    var margin = {top: 30, right: 60, bottom: 40, left: 60},
+        width = 960 - margin.left - margin.right,
+        height = 500 - margin.top - margin.bottom;
+
+    var svg = d3.select("#my_dataviz")
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    var tooltip = d3.select("#tooltip");
+
+    d3.json("data.json").then(function(data) {
+        var keys = Object.keys(data[0]).filter(function(key) { return key !== "date"; });
+
+        var color = d3.scaleOrdinal()
+            .domain(keys)
+            .range(d3.schemeSet1);
+
+        var x = d3.scaleLinear()
+            .domain(d3.extent(data, function(d, i) { return i; }))
+            .range([0, width]);
+
+        svg.append("g")
+            .attr("transform", "translate(0," + height + ")")
+            .call(d3.axisBottom(x).ticks(5));
+
+        var y = d3.scaleLinear()
+            .domain([0, d3.max(data, function(d) { return d3.max(keys, function(key) { return +d[key] }); })])
+            .range([height, 0]);
+
+        svg.append("g")
+            .call(d3.axisLeft(y));
+
+        var line = d3.line()
+            .x(function(d, i) { return x(i); })
+            .y(function(d) { return y(d.value); });
+
+        keys.forEach(function(key) {
+            var datapoints = data.map(function(d, i) {
+                return {index: i, value: +d[key]};
+            });
+
+            var path = svg.append("path")
+                .datum(datapoints)
+                .attr("fill", "none")
+                .attr("stroke", color(key))
+                .attr("stroke-width", 1.5)
+                .attr("d", line)
+                .on("mousemove", function(d) {
+                    var mouse = d3.mouse(this);
+                    var xValue = Math.round(x.invert(mouse[0]));
+                    var yValue = d[xValue].value;
+                    tooltip
+                        .style("display", null)
+                        .style("left", d3.event.pageX + "px")
+                        .style("top", d3.event.pageY - 50 + "px")
+                        .html(key + "<br>" + yValue);
+                })
+                .on("mouseout", function() {
+                    tooltip.style("display", "none");
+                });
+
+            var totalLength = path.node().getTotalLength();
+
+            path
+                .attr("stroke-dasharray", totalLength + " " + totalLength)
+                .attr("stroke-dashoffset", totalLength)
+                .transition()
+                .duration(2000)
+                .ease(d3.easeLinear)
+                .attr("stroke-dashoffset", 0);
+        });
+    });
+    </script>
+</body>
+</html>
